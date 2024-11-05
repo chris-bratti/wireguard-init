@@ -299,9 +299,7 @@ choose_net_device (){
 # Configures port forwarding to allow for full network sharing
 configure_port_forwarding (){
 	# Adds forwarding rule to systctl
-	if ! grep -q "net.ipv4.ip_forward=1" "/etc/sysctl.conf"; then
-		echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-	fi
+	sudo sed -i '/^#*net\.ipv4\.ip_forward=1/s/^#//' /etc/sysctl.conf
 	info_message "Enabling network forwarding..."
 
 	sudo sysctl -p > /dev/null
