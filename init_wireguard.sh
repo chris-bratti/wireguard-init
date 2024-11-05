@@ -192,7 +192,7 @@ EOF
 	# Gives the user a choice in how they would like to set up their client
 	info_message "Choose an option to configure client:"
 	echo -e "${GREEN}1.${CYAN} QR code - great for mobile clients${NC}"
-	echo -e "${GREEN}2.${CYAN} Client companion scrit - good to automate CLI clients${NC}"
+	echo -e "${GREEN}2.${CYAN} Client companion script - good to automate CLI clients${NC}"
 	echo -e "${GREEN}2.${CYAN} Copy config file - Manually copy values from the config file to client${NC}"
 	
 	configOption=$(get_user_input "Choose an option" "^[1-3]{1}$")
@@ -251,18 +251,18 @@ client_script_config (){
 	cat << EOF
 ##########################################################
 #  For automated peer setup, you will need access to the #
-#	peer machine. There is a companion script to 		 #
-#	configure the client machine as a peer. 			 #
-# 														 #
+#       peer machine. There is a companion script to     #
+#       configure the client machine as a peer.          #
+#                                                        #
 # You will need to copy the peer configuration file from #
 #  above onto the client machine and pass its location   #
-#  as an argument to the script					     	 #
-# 														 #
+#  as an argument to the script                          #
+#                                                        #
 # Run the following commands on the peer machine and     #
-#	follow the script instructions:						 #
-#														 #
-# wget $clientScriptLocation							
-# chmod +x init_wg_client.sh							 #
+#       follow the script instructions:                  #
+#                                                        #
+# wget $clientScriptLocation
+# chmod +x init_wg_client.sh                             #
 # sudo ./init_wg_client.sh /path/to/peerConfig.conf      #
 ##########################################################
 EOF
@@ -302,6 +302,7 @@ configure_port_forwarding (){
 	sudo sed -i '/^#*net\.ipv4\.ip_forward=1/s/^#//' /etc/sysctl.conf
 	info_message "Enabling network forwarding..."
 
+# TODO: check output to confirm rule was added
 	sudo sysctl -p > /dev/null
 
 	info_message "✅ Done"
@@ -492,7 +493,7 @@ binaryOptionRegex="^[yYnN]$"
 ipRegex="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
 ipRangeRegex="$ipRegex(\/(3[0-2]|[12]?[0-9]))?$"
 # Companion script location
-clientScriptLocation="www.github.com/path/here/blah"
+clientScriptLocation="https://raw.githubusercontent.com/chris-bratti/wireguard-init/refs/heads/master/init_wg_client.sh"
 
 configPath="/etc/wireguard"
 # Text colors
