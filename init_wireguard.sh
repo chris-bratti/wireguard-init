@@ -170,6 +170,8 @@ add_peer () {
 		listenPort=$(sudo grep "ListenPort" $configPath/wg0.conf | cut -d "=" -f 2 | xargs)
 	fi
 
+	#TODO: Check before setting AllowedIPs
+
 # Creates the new peer configuration file
 cat << EOF > $newPeerPath
 [Interface]
@@ -247,7 +249,6 @@ setup_mobile_client (){
 
 # Gives instructions on running the init_wg_client.sh script on client machine
 client_script_config (){
-	sudo cat $1
 	cat << EOF
 ##########################################################
 #  For automated peer setup, you will need access to the #
@@ -255,7 +256,7 @@ client_script_config (){
 #       configure the client machine as a peer.          #
 #                                                        #
 # You will need to copy the peer configuration file from #
-#  above onto the client machine and pass its location   #
+#  below onto the client machine and pass its location   #
 #  as an argument to the script                          #
 #                                                        #
 # Run the following commands on the peer machine and     #
@@ -266,6 +267,8 @@ client_script_config (){
 # sudo ./init_wg_client.sh /path/to/peerConfig.conf      #
 ##########################################################
 EOF
+	info_message "#############Config File#############"
+	cat $1
 	info_message "When client setup is complete, press enter"
 	read
 }
