@@ -98,23 +98,6 @@ init_client (){
 
     ipAddress=$(echo $ipAddressSubnet | sed 's#/.*##')
 
-cat << EOF
-#####################################################
-# Routing all traffic through the VPN can cause SSH #
-#  lockouts for peers you are connecting to through #
-#  SSH.                                             #
-#                                                   #
-# In order to prevent lockouts, please confirm the  #
-#  subnet below. Devices on this subnet will be     #
-#  able to continue using SSH to connect to the     #
-#  client machine                                   #
-#####################################################
-EOF
-    
-    if ! get_binary_user_input "Is the address range $subnetAddressRange correct?";then
-        echo "Handle case here"
-    fi
-
     routeTrafficLines="PostUp = ip rule add from $ipAddress table main\nPostUp = ip route add default via $gatewayAddress table main\nPreDown = ip rule delete from $ipAddress table main\nPreDown = ip route delete default via $gatewayAddress table main"
 
     sed -i "/^Address = [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/[0-9]\{1,2\}$/a $routeTrafficLines" $configFile
