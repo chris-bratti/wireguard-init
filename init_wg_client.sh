@@ -94,7 +94,7 @@ init_client (){
 
     ipAddressSubnet=$(ip -brief address show $device | awk '{for(i=1;i<=NF;i++) if($i=="UP") print $(i+1)}')
 
-    subnetAddressRange=$(echo $ipAddressSubnet | sed 's/\(\([0-9]\{1,3\}\.\)\{3\}\)[0-9]\{1,3\}/\10/')
+    #subnetAddressRange=$(echo $ipAddressSubnet | sed 's/\(\([0-9]\{1,3\}\.\)\{3\}\)[0-9]\{1,3\}/\10/')
 
     ipAddress=$(echo $ipAddressSubnet | sed 's#/.*##')
 
@@ -115,13 +115,11 @@ EOF
         echo "Handle case here"
     fi
 
-    routeTrafficLines="PostUp = ip rule add table 200 from $ipAddress\nPostUp = ip route add table 200 default via $gatewayAddress\nPostUp = ip route add $subnetAddressRange via $gatewayAddress\nPreDown = ip rule delete table 200 from $ipAddress\nPreDown = ip route delete table 200 default via $gatewayAddress\nPreDown = ip route delete $subnetAddressRange via $gatewayAddress"
+    routeTrafficLines="PostUp = ip rule add from $ipAddress table main\nPostUp = ip route add default via $gatewayAddress table main\nPreDown = ip rule delete from $ipAddress table main\nPreDown = ip route delete default via $gatewayAddress table main"
 
     sed -i "/^Address = [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/[0-9]\{1,2\}$/a $routeTrafficLines" $configFile
 
     info_message "✅ Done"
-
-    
 
 cat << EOF
 #####################################################
@@ -172,6 +170,11 @@ if [ -n $1 ]; then
     configFile=$1
 else
     configFile="$scriptPath/wg0.conf"
+fi
+
+if [ -f "$configFile" ]; then
+    error_message "Config file not found. Please pass path to valid config file as CLI argument"
+    exit 1
 fi
 
 
