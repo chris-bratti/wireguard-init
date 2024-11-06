@@ -45,17 +45,51 @@ sudo ./init_wireguard.sh init_server
 - Configure the WireGuard server interface.
 - Define the server IP address and port.
 - Set up IP forwarding and routing rules.
-- Provide options to automate client configuration
+- Automate adding a peer
+
+The script will give you the option to add a peer and automate the peer configuration. After your server is up and running, you can use the `init_wireguard` script to add additional peers!
+
+#### Add additional peers
+```
+sudo ./init_wireguard.sh add_peer
+```
+
+After creating your WireGuard server, you can run with the `add_peer` option to configure and add a new peer to your server.
+
+#### It will:
+- Find the next available IP in the server's address range
+- Generate the necessary client configurations
+- Provide options to automate peer configuration
 
 The server script will generate all the necessary configs to set up a client - even a QR code for mobile clients!
 
 ### Client Setup
-If you are connecting a headless machine as a VPN client, the client setup script will come in handy! Copy the configuration file provided by the server script and pass it into the client script.
+The `init_wireguard` server script gives you a lot of options to configure a new client. However, if you are connecting a headless machine as a VPN client, the client setup script will come in handy!
+
+#### 1. Copy the configuration file
+
+The server script will generate a configuration file that will look something like this:
+
+```
+[Interface]
+PrivateKey = <private-key>
+Address = 10.8.0.2/24
+
+[Peer]
+PublicKey = <public-key>
+AllowedIPs = 10.8.0.0/24, fd24:609a:6c18::/64
+Endpoint = 203.0.113.1:51820
+
+```
+
 #### Run the Client Setup Script:
 
 ```
 sudo ./init_wg_client.sh /path/to/config.conf
 ```
+
+Where `path/to/config.conf` is the location of the configuration file that was copied onto the client machine.
+
 #### This script will:
 - Install WireGuard
 - Configure the WireGuard client
