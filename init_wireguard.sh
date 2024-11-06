@@ -211,6 +211,7 @@ EOF
 		if sudo wg | grep -q "latest handshake"; then
         	success_message "Client is connected to WireGuard server!"
 			return 0
+		fi
 	done
 
 	info_message "Setup is done, however"
