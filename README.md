@@ -51,7 +51,7 @@ The script will give you the option to add a peer and automate the peer configur
 sudo ./init_wireguard.sh add_peer
 ```
 
-#### It will:
+#### This command will:
 - Find the next available IP in the server's address range
 - Generate the necessary client configurations
 - Provide options to automate peer configuration
@@ -98,7 +98,7 @@ Where `path/to/config.conf` is the location of the configuration file that was c
 
 #### Connect to the VPN: 
 
-The script can configure WireGuard to run automatically as a service. Otherwise, to start and stop wireguard, use:
+The script can configure WireGuard to run automatically as a service on both the server and the client if desired. However, to manually start and stop the WireGuard service, use:
 
 ```
 sudo wg-quick up wg0 #starts wireguard
