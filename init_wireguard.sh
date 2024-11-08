@@ -93,8 +93,6 @@ check_connection() {
 	return 1
 }
 
-
-
 # Prints out info message
 info_message (){
 	echo -e "${CYAN}$1${NC}" >&2
