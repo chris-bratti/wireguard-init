@@ -158,16 +158,26 @@ init_client (){
 		exit 0
 	fi
 
-	# Checks file was passed in
-	if [[ $# -ne 2 ]]; then
+	if [[ -z $1 ]]; then
 		error_message "No configuration file supplied"
         error_message "Usage: $0 init_client /path/to/config.conf"
         exit 1
-    fi
+	fi
+
+	userConfFile="$1"
+	shift
+
+	while getopts "a" opt; do
+		case $opt in
+			a) autoRunWg=true ;;
+			*) error_message "Invalid option for init_client"; show_help; exit 1 ;;
+		esac
+	done
+	shift $((OPTIND - 1)) 
 
 	# Validates config file
 	info_message "Validating config file...."
-	peerConfigFile=$(validate_config_file $2)
+	peerConfigFile=$(validate_config_file $userConfFile)
 	info_message "✅ Done"
 
     info_message "Installing WireGuard...."
@@ -199,35 +209,16 @@ init_client (){
     sed -i "/^Address = [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/[0-9]\{1,2\}$/a $routeTrafficLines" $peerConfigFile
 
     info_message "✅ Done"
-
-cat << EOF
-#####################################################
-# WireGuard is currently configured for manual      #
-#  start/stop.                                      #
-#                                                   #
-# You can use wq-quick to manage the service:       #
-#     wq-quick start wg0 #Starts wireguard          #
-#     wq-quick stop wg0 #Stops wireguard            #
-#                                                   #
-# You can also configure WireGuard to run           #
-#  automatically as a service - though keep in mind #
-#  this will mean your client will be connected to  #
-#  the VPN by default unless WireGuard is disabled  #
-#####################################################
-EOF
-    if get_binary_user_input "Configure WireGuard to start automatically?"; then
-        configure_wg_as_service
-    else
-        info_message "WireGuard will not run automatically, to connect to the wireguard VPN, use wq-quick"
-		sleep 2
-    fi
+	
+	# Option to start wireguard by default
+	$autoRunWg && configure_wg_as_service
 
 	# Starts wireguard
     sudo wg-quick up wg0 > /dev/null
 
 	# After wireguard is started, server script can continue
 	success_message "Wireguard started!"
-	info_message "Press continue on the SERVER script first, then come back here and press continue"
+	info_message "Client setup is almost done! Make sure server script has finished and then press enter to continue"
 	sleep 2
 	read
 
@@ -273,17 +264,50 @@ get_highest_ip () {
 	fi
 }
 
+validate_peer_options (){
+	if [[ -n $dnsAddress && ! $dnsAddress =~ $ipRegex ]]; then
+		error_message "Invalid DNS Address format"
+		dnsAddress=$(get_user_input "Enter valid DNS Address" $ipRegex)
+	fi
+
+	[ -z $peerName ] && read -p "Create name for new peer: " peerName
+
+	# Each peer will have a unique config file based on a provided name
+	while true; do
+		if [ -f "$peerConfigPath/$peerName.conf" ]; then
+    		error_message "Peer config already exists, choose a different one"
+			read -p "Create name for new peer: " peerName
+		else
+			newPeerPath="$peerConfigPath/$peerName.conf"
+			break
+		fi
+	done
+}
+
 # Adds a peer to existing wireguard configuration
 add_peer () {
 	# Checks to make sure wireguard server has already been set up
 	if [ ! -f $configPath/wg0.conf ]; then
 		error_message "Could not add peer, WireGuard configuration not found"
 		error_message "Generate one by running $0 init_server"
-		return 1
+		exit 1
 	fi
+
+	while getopts "n:d:o:" opt; do
+        case $opt in
+            n) peerName="$OPTARG" ;;
+            d) dnsAddress="$OPTARG" ;;
+			o) configOption="$OPTARG" ;;
+            *) echo "Invalid option for add_peer"; exit 1 ;;
+        esac
+    done
+    shift $((OPTIND - 1)) 
 
 	peerConfigPath="$configPath/wg-peers"
 	mkdir -p $peerConfigPath
+	newPeerPath=""
+
+	validate_peer_options
 
 	# Finds the IP addresses already in use by other peers
 	usedIps=$(grep "AllowedIPs" "$configPath/wg0.conf" | sed 's/AllowedIPs = //')
@@ -306,18 +330,6 @@ add_peer () {
 	publicKey=$(sudo cat $configPath/public.key)
 	publicIp="$(curl --silent ifconfig.me)"
 
-	newPeerPath=""
-
-	# Each peer will have a unique config file based on a provided name
-	while true; do
-		read -p "Create name for new peer: " peerName
-		if [ -f "$peerConfigPath/$peerName.conf" ]; then
-    		error_message "Peer config already exists, choose a different one"
-		else
-			newPeerPath="$peerConfigPath/$peerName.conf"
-			break
-		fi
-	done
 	
 	info_message "Generating keys...."
 	# Generates peer public and private keys
@@ -326,18 +338,10 @@ add_peer () {
 
 	info_message "✅ Done"
 
-	# Users can provide a custom DNS address for the new peer to use
-	if get_binary_user_input "Use custom DNS address?"; then
-		dnsAddress="$(get_user_input "DNS address" $ipRegex)"
-		info_message "✅ DNS Address set"
-	fi
-
 	# Gets the listen port from server config
 	if [ -z $listenPort ]; then
 		listenPort=$(sudo grep "ListenPort" $configPath/wg0.conf | cut -d "=" -f 2 | xargs)
 	fi
-
-	#TODO: Check before setting AllowedIPs
 
 # Creates the new peer configuration file
 cat << EOF > $newPeerPath
@@ -345,9 +349,7 @@ cat << EOF > $newPeerPath
 Address = $nextIp
 PrivateKey = $peerPrivateKey
 EOF
-	if [[ -n "$dnsAddress" ]]; then
-    	echo "DNS = $dnsAddress" >> $newPeerPath
-	fi
+	if [ -n "$dnsAddress" ] && echo "DNS = $dnsAddress" >> $newPeerPath
 cat << EOF >> $newPeerPath
 
 [Peer]
@@ -358,13 +360,14 @@ EOF
 
 	info_message "✅ Peer configuration generated"
 
-	# Gives the user a choice in how they would like to set up their client
-	info_message "Choose an option to configure client:"
-	echo -e "${GREEN}1.${CYAN} QR code - great for mobile clients${NC}"
-	echo -e "${GREEN}2.${CYAN} Client companion script - good to automate CLI clients${NC}"
-	echo -e "${GREEN}2.${CYAN} Copy config file - Manually copy values from the config file to client${NC}"
-	
-	configOption=$(get_user_input "Choose an option" "^[1-3]{1}$")
+	if [[ -z $configOption ]]; then
+		# Gives the user a choice in how they would like to set up their client
+		info_message "Choose an option to configure client:"
+		echo -e "${GREEN}1.${CYAN} QR code - great for mobile clients${NC}"
+		echo -e "${GREEN}2.${CYAN} Client companion script - good to automate CLI clients${NC}"
+		echo -e "${GREEN}2.${CYAN} Copy config file - Manually copy values from the config file to client${NC}"
+		configOption=$(get_user_input "Choose an option" "^[1-3]{1}$")
+	fi
 
 	case $configOption in
 		1)
@@ -434,7 +437,7 @@ client_script_config (){
 EOF
 	info_message "#############Config File#############"
 	cat $1
-	info_message "When client setup is complete, press enter"
+	info_message "After copying above config to client machine, press enter"
 	read
 }
 
@@ -513,6 +516,27 @@ configure_port_forwarding (){
 	fi
 }
 
+validate_server_options (){
+
+	[ -z $subnetRange ] && subnetRange="10.10.10.1/24"
+
+	if [[ ! $subnetRange =~ $ipRangeRegex]]; then
+		error_message "IP range is not valid"		
+		subnetRange=$(get_user_input "Enter a valid IP Range" $ipRangeRegex)
+	fi
+
+	info_message "✅ Address range set"
+
+	[ -z $listenPort ] && listenPort="51820"
+
+	if [[! $listenPort =~ "[0-9]+" ]]; then
+		error_message "ListenPort is not valid"
+		listenPort=$(get_user_input "Enter a valid ListenPort" "[0-9]+")
+	fi
+
+	info_message "✅ ListenPort set"
+}
+
 # Creates and initializes a new WireGuard server
 init_wireguard_server (){
 	error_message "WARNING: This script will overwrite any existing wireguard configuration and configure this machine as a wireguard server!"
@@ -520,6 +544,19 @@ init_wireguard_server (){
 		info_message "Aborting server setup"
 		exit 0
 	fi
+	subnetRange=""
+	listenPort=""
+
+	while getopts "i:p:" opt; do
+        case $opt in
+            i) subnetRange="$OPTARG" ;;
+            p) listenPort="$OPTARG" ;;
+            *) echo "Invalid option for init_server"; exit 1 ;;
+        esac
+    done
+    shift $((OPTIND - 1)) 
+
+	validate_server_options
 
 	# Updates and installs Wireguard
 	info_message "Updating and installing wireguard...."
@@ -541,53 +578,6 @@ init_wireguard_server (){
 	sudo cat $configPath/private.key | wg pubkey > $configPath/public.key
 
 	info_message "✅ Done"
-
-	# Allows users to pick port range
-	if get_binary_user_input "Change default wireguard address range from 10.10.10.1/24?"; then
-cat << EOF
-###########################################################
-# The WireGuard address range is used for WireGuard peers #
-#  to communicate with each other                         #
-#                                                         #
-# You must use an internal IP address range for this      #
-# Valid internal IP ranges are:                           #
-#                                                         #
-#    10.0.0.0 to 10.255.255.255                           #
-#    172.16.0.0 to 172.31.255.255                         #
-#    192.168.0.0 to 192.168.255.255                       #
-#                                                         #
-# Enter IP in format xxx.xxx.xxx.1/xx                     #
-# Example: 192.168.8.1/24                                 #
-###########################################################
-EOF
-
-		subnetRange=$(get_user_input "Enter an IP Range" $ipRangeRegex)
-	else
-		subnetRange="10.10.10.1/24"
-	fi
-
-	info_message "✅ Address range set"
-
-	# Allows users to change default Listen Port
-	if get_binary_user_input "Change default ListenPort from 51820?"; then
-cat << EOF
-###########################################################
-# The ListenPort determines the UDP port clients will use #
-#  to connect to the WireGuard server.                    #
-#                                                         #
-# Try not to use common ports like 8080, 22, 80, etc, as  #
-#  you might run into port conflicts                      #
-#                                                         #
-# The port you choose will also need to be forwarded on   #
-#  your router (we will cover that later)                 #
-###########################################################
-EOF
-		listenPort=$(get_user_input "Enter a ListenPort" "[0-9]+")
-	else
-		listenPort="51820"
-	fi
-
-	info_message "✅ ListenPort set"
 
 	privateKey=$(sudo cat $configPath/private.key)
 
@@ -638,13 +628,27 @@ EOF
 
 # Shows help message
 show_help (){
-	info_message "Usage: $0 <command>"
+	info_message "Usage: $0 <command> <options>"
 	info_message "Commands:"
-	success_message "  init_server       Creates a WireGuard server"
-	success_message "  init_client       Configures a machine to be a wireguard peer"
-	success_message "  add_peer          Adds a new peer to an already existing server"
-	success_message "  help              Shows this help messasge!"
-
+	success_message "  init_server - Creates a WireGuard server"
+	info_message "      Arguments (Optional):"
+	info_message "        -i <x.x.x.1/x>: Internal IP range for WireGuard network (ex. 10.0.0.1/24)"
+	info_message "        -p <x>: Port that WireGuard will listen on (Default 51820)"
+	echo ""
+	success_message "  init_client - Configures a machine to be a wireguard peer"
+	info_message "      Arguments (Optional):"
+	info_message "        -a: Flag to configure WireGuard to autorun"
+	echo ""
+	success_message "  add_peer - Adds a new peer to an already existing server"
+	info_message "      Arguments (Optional):"
+	info_message "        -n <name>: Name for new peer"
+	info_message "        -d <x.x.x.x>: DNS Address for peer to use"
+	info_message "        -o <#>: Peer configuration option. One of:"
+	info_message "                1. QR Code"
+	info_message "                2. Client automation script"
+	info_message "                3. Manual setup"
+	echo ""
+	success_message "  help - Shows this help messasge!"
 }
 
 scriptPath="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -673,10 +677,11 @@ if [[ $# -lt 1 ]]; then
 fi
 
 command=$1
+shift
 
 case "$command" in
     init_server)
-        init_wireguard_server
+        init_wireguard_server "$@"
         ;;
 	init_client)
 		init_client "$@"
