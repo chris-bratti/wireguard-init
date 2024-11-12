@@ -245,12 +245,13 @@ increment_ip () {
     echo "$1" | awk -F '[./]' '{ printf "%d.%d.%d.%d/%s\n", $1, $2, $3, $4+1, $5 }'
 }
 
+# Finds the next available IP using the wireguard config file
 get_next_ip (){
 	# Gets server address
-	local serverAddress=$(grep "Address" test_config.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
+	local serverAddress=$(grep "Address" $1/wg0.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
 
 	# Finds the IP addresses already in use by other peers
-	local usedIps=$(grep "AllowedIPs" "test_config.conf" | sed 's/AllowedIPs = //')
+	local usedIps=$(grep "AllowedIPs" "$1/wg0.conf" | sed 's/AllowedIPs = //')
 
 	# Sets the nextIp to one higher than the server address
 	local nextIp=$(increment_ip $serverAddress)
@@ -277,6 +278,9 @@ validate_peer_options (){
 	fi
 
 	[ -z $peerName ] && read -p "Create name for new peer: " peerName
+
+	local peerConfigPath="$configPath/wg-peers"
+	mkdir -p $peerConfigPath
 
 	# Each peer will have a unique config file based on a provided name
 	while true; do
@@ -309,14 +313,12 @@ add_peer () {
     done
     shift $((OPTIND - 1)) 
 
-	peerConfigPath="$configPath/wg-peers"
-	mkdir -p $peerConfigPath
 	newPeerPath=""
 
 	validate_peer_options
 
 	# Gets the next available IP in the address range
-	nextIp=$(get_next_ip)
+	nextIp=$(get_next_ip $configPath)
 
 	# Gets server public key as well as server's public IP address
 	publicKey=$(sudo cat $configPath/public.key)
