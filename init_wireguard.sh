@@ -114,13 +114,13 @@ validate_config_file (){
 	# Checks if file exists
     if [ ! -f "$configFile" ]; then
         error_message "Error: Configuration file not found. Please check server script for instructions on running peer setup."
-        return 1
+        exit 1
     fi
 
 	# Checks if file seems to be a valid wireguard config
     if ! grep -q "\[Interface\]" "$configFile" || ! grep -q "\[Peer\]" "$configFile";then
         error_message "Error: Configuration file seems to be malformed. Please check server script for instructions on running peer setup."
-        return 1
+        exit 1
     fi
 
 	# Makes sure wireguard path exists
