@@ -245,26 +245,32 @@ increment_ip () {
     echo "$1" | awk -F '[./]' '{ printf "%d.%d.%d.%d/%s\n", $1, $2, $3, $4+1, $5 }'
 }
 
-# Returns the highest IP address given 2 IPs in the same subnet
-get_highest_ip () {
-	ip1=$1
-	ip2=$2
+get_next_ip (){
+	# Gets server address
+	local serverAddress=$(grep "Address" test_config.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
 
-	[ -z $ip1 ] && echo $ip2 && return
-	[ -z $ip2 ] && echo $ip1 && return
+	# Finds the IP addresses already in use by other peers
+	local usedIps=$(grep "AllowedIPs" "test_config.conf" | sed 's/AllowedIPs = //')
 
-	# Gets the last octets and compares them to each other
-	octect1=$(echo "$ip1" | sed 's/^.*\.//;s/\/.*$//')
-	octect2=$(echo "$ip2" | sed 's/^.*\.//;s/\/.*$//')
+	# Sets the nextIp to one higher than the server address
+	local nextIp=$(increment_ip $serverAddress)
 
-	if [ $octect1 -gt $octect2 ]; then
-		echo $ip1
-	else
-		echo $ip2
-	fi
+	# Increments nextIp until it finds one not in use by other peers
+	while true
+	do
+		if printf "%s\n" "${usedIps[@]}" | grep -q -x "$nextIp"; then
+			nextIp=$(increment_ip $nextIp)
+		else
+			break
+		fi
+	done
+
+	echo $nextIp
 }
 
+# Validates the user-supplied options
 validate_peer_options (){
+
 	if [[ -n $dnsAddress && ! $dnsAddress =~ $ipRegex ]]; then
 		error_message "Invalid DNS Address format"
 		dnsAddress=$(get_user_input "Enter valid DNS Address" $ipRegex)
@@ -309,22 +315,8 @@ add_peer () {
 
 	validate_peer_options
 
-	# Finds the IP addresses already in use by other peers
-	usedIps=$(grep "AllowedIPs" "$configPath/wg0.conf" | sed 's/AllowedIPs = //')
-	
-	# Gets the internal IP address of the server
-	serverAddress=$(sudo grep "Address" $configPath/wg0.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
-
-	# Sets the highestIp to the server address
-	highestIp=$serverAddress
-
-	# Finds the highest IP address in use
-	for ip in $usedIps; do
-		highestIp=$(get_highest_ip $ip $highestIp)
-	done
-	
-	# Increments the highest found IP to determine the next available IP in the range
-	nextIp=$(increment_ip "$highestIp")
+	# Gets the next available IP in the address range
+	nextIp=$(get_next_ip)
 
 	# Gets server public key as well as server's public IP address
 	publicKey=$(sudo cat $configPath/public.key)
