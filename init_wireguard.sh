@@ -192,9 +192,7 @@ init_client (){
     device=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	if [ $(echo $device |  wc -w) -gt 1 ]; then
-        choose_net_device
-	fi
+	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
 	# Gets gateway address for client machine
     gatewayAddress=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}')
@@ -358,7 +356,7 @@ EOF
 		# Gives the user a choice in how they would like to set up their client
 		info_message "Choose an option to configure client:"
 		echo -e "${GREEN}1.${CYAN} QR code - great for mobile clients${NC}"
-		echo -e "${GREEN}2.${CYAN} Client companion script - good to automate CLI clients${NC}"
+		echo -e "${GREEN}2.${CYAN} Client automation script - good to automate CLI clients${NC}"
 		echo -e "${GREEN}2.${CYAN} Copy config file - Manually copy values from the config file to client${NC}"
 		configOption=$(get_user_input "Choose an option" "^[1-3]{1}$")
 	fi
@@ -437,8 +435,9 @@ EOF
 
 # If a user has multiple network devices, allows them to choose which one to configure
 choose_net_device (){
-	local deviceString=$device
-	devicesArray=($deviceString)
+	local deviceString=$1
+	local devicesArray=($deviceString)
+	local chosenDevice=""
 	info_message "More than one network device was detected on your system:"
 	
 	# Prints list of devices found
@@ -452,7 +451,7 @@ choose_net_device (){
 	while true; do   
 		chosenDevice=$(get_user_input "Enter network device name" ".+")
 		if printf "%s\n" "${devicesArray[@]}" | grep -q -x "$chosenDevice"; then
-			device=$chosenDevice
+			echo $chosenDevice
 			break
 		else
 			error_message "Unknown device, please choose one from the list of devices above"
@@ -477,9 +476,7 @@ configure_port_forwarding (){
 	device=$(ip route list default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	if [ $(echo $device |  wc -w) -gt 1 ]; then
-        choose_net_device
-	fi
+	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
 	# UFW rules to add to wireguard configuration file	
 	portForwardingLines="PostUp = ufw route allow in on wg0 out on $device\nPostUp = iptables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPostUp = ip6tables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPreDown = ufw route delete allow in on wg0 out on $device\nPreDown = iptables -t nat -D POSTROUTING -o $device -j MASQUERADE\nPreDown = ip6tables -t nat -D POSTROUTING -o $device -j MASQUERADE"
