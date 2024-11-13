@@ -61,21 +61,6 @@ get_binary_user_input() {
 	fi
 }
 
-# Displays small spinner to show a process running
-spinner() {
-	local pid=$!
-	local delay=0.1
-	local spinstr='|/-\'
-	while [ "$(ps a | awk '{print $1}' | grep "$pid")" ]; do
-		local temp=${spinstr#?}
-		printf " [%c]  " "$spinstr"
-		local spinstr=$temp${spinstr%"$temp"}
-		sleep $delay
-		printf "\b\b\b\b\b\b"
-	done
-	printf "    \b\b\b\b"
-}
-
 # Checks peer's connection to server
 check_connection() {
 	retryLimit=5
@@ -212,7 +197,7 @@ init_client() {
 	info_message "✅ Done"
 
 	# Option to start wireguard by default
-	$autoRunWg && configure_wg_as_service
+	[ $autoRunWg ] && configure_wg_as_service
 
 	# Starts wireguard
 	sudo wg-quick up wg0 >/dev/null
@@ -523,7 +508,7 @@ validate_server_options() {
 
 	[ -z $listenPort ] && listenPort="51820"
 
-	if [[! $listenPort =~ "[0-9]+" ]]; then
+	if [[ ! $listenPort =~ "[0-9]+" ]]; then
 		error_message "ListenPort is not valid"
 		listenPort=$(get_user_input "Enter a valid ListenPort" "[0-9]+")
 	fi
