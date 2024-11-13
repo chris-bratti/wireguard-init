@@ -192,9 +192,7 @@ init_client (){
     device=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	if [ $(echo $device |  wc -w) -gt 1 ]; then
-        choose_net_device
-	fi
+	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
 	# Gets gateway address for client machine
     gatewayAddress=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}')
@@ -245,32 +243,42 @@ increment_ip () {
     echo "$1" | awk -F '[./]' '{ printf "%d.%d.%d.%d/%s\n", $1, $2, $3, $4+1, $5 }'
 }
 
-# Returns the highest IP address given 2 IPs in the same subnet
-get_highest_ip () {
-	ip1=$1
-	ip2=$2
+# Finds the next available IP using the wireguard config file
+get_next_ip (){
+	# Gets server address
+	local serverAddress=$(grep "Address" $1/wg0.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
 
-	[ -z $ip1 ] && echo $ip2 && return
-	[ -z $ip2 ] && echo $ip1 && return
+	# Finds the IP addresses already in use by other peers
+	local usedIps=$(grep "AllowedIPs" "$1/wg0.conf" | sed 's/AllowedIPs = //')
 
-	# Gets the last octets and compares them to each other
-	octect1=$(echo "$ip1" | sed 's/^.*\.//;s/\/.*$//')
-	octect2=$(echo "$ip2" | sed 's/^.*\.//;s/\/.*$//')
+	# Sets the nextIp to one higher than the server address
+	local nextIp=$(increment_ip $serverAddress)
 
-	if [ $octect1 -gt $octect2 ]; then
-		echo $ip1
-	else
-		echo $ip2
-	fi
+	# Increments nextIp until it finds one not in use by other peers
+	while true
+	do
+		if printf "%s\n" "${usedIps[@]}" | grep -q -x "$nextIp"; then
+			nextIp=$(increment_ip $nextIp)
+		else
+			break
+		fi
+	done
+
+	echo $nextIp
 }
 
+# Validates the user-supplied options
 validate_peer_options (){
+
 	if [[ -n $dnsAddress && ! $dnsAddress =~ $ipRegex ]]; then
 		error_message "Invalid DNS Address format"
 		dnsAddress=$(get_user_input "Enter valid DNS Address" $ipRegex)
 	fi
 
 	[ -z $peerName ] && read -p "Create name for new peer: " peerName
+
+	local peerConfigPath="$configPath/wg-peers"
+	mkdir -p $peerConfigPath
 
 	# Each peer will have a unique config file based on a provided name
 	while true; do
@@ -303,28 +311,12 @@ add_peer () {
     done
     shift $((OPTIND - 1)) 
 
-	peerConfigPath="$configPath/wg-peers"
-	mkdir -p $peerConfigPath
 	newPeerPath=""
 
 	validate_peer_options
 
-	# Finds the IP addresses already in use by other peers
-	usedIps=$(grep "AllowedIPs" "$configPath/wg0.conf" | sed 's/AllowedIPs = //')
-	
-	# Gets the internal IP address of the server
-	serverAddress=$(sudo grep "Address" $configPath/wg0.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
-
-	# Sets the highestIp to the server address
-	highestIp=$serverAddress
-
-	# Finds the highest IP address in use
-	for ip in $usedIps; do
-		highestIp=$(get_highest_ip $ip $highestIp)
-	done
-	
-	# Increments the highest found IP to determine the next available IP in the range
-	nextIp=$(increment_ip "$highestIp")
+	# Gets the next available IP in the address range
+	nextIp=$(get_next_ip $configPath)
 
 	# Gets server public key as well as server's public IP address
 	publicKey=$(sudo cat $configPath/public.key)
@@ -364,7 +356,7 @@ EOF
 		# Gives the user a choice in how they would like to set up their client
 		info_message "Choose an option to configure client:"
 		echo -e "${GREEN}1.${CYAN} QR code - great for mobile clients${NC}"
-		echo -e "${GREEN}2.${CYAN} Client companion script - good to automate CLI clients${NC}"
+		echo -e "${GREEN}2.${CYAN} Client automation script - good to automate CLI clients${NC}"
 		echo -e "${GREEN}2.${CYAN} Copy config file - Manually copy values from the config file to client${NC}"
 		configOption=$(get_user_input "Choose an option" "^[1-3]{1}$")
 	fi
@@ -443,8 +435,9 @@ EOF
 
 # If a user has multiple network devices, allows them to choose which one to configure
 choose_net_device (){
-	local deviceString=$device
-	devicesArray=($deviceString)
+	local deviceString=$1
+	local devicesArray=($deviceString)
+	local chosenDevice=""
 	info_message "More than one network device was detected on your system:"
 	
 	# Prints list of devices found
@@ -458,7 +451,7 @@ choose_net_device (){
 	while true; do   
 		chosenDevice=$(get_user_input "Enter network device name" ".+")
 		if printf "%s\n" "${devicesArray[@]}" | grep -q -x "$chosenDevice"; then
-			device=$chosenDevice
+			echo $chosenDevice
 			break
 		else
 			error_message "Unknown device, please choose one from the list of devices above"
@@ -483,9 +476,7 @@ configure_port_forwarding (){
 	device=$(ip route list default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	if [ $(echo $device |  wc -w) -gt 1 ]; then
-        choose_net_device
-	fi
+	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
 	# UFW rules to add to wireguard configuration file	
 	portForwardingLines="PostUp = ufw route allow in on wg0 out on $device\nPostUp = iptables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPostUp = ip6tables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPreDown = ufw route delete allow in on wg0 out on $device\nPreDown = iptables -t nat -D POSTROUTING -o $device -j MASQUERADE\nPreDown = ip6tables -t nat -D POSTROUTING -o $device -j MASQUERADE"
