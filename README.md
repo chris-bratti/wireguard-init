@@ -53,12 +53,13 @@ The script will give you the option to add a peer and automate the peer configur
 
 #### Add additional peers
 ```
-sudo ./init_wireguard.sh add_peer -n peerName -d 10.10.10.1 -o 1
+sudo ./init_wireguard.sh add_peer -n peerName -d 10.10.10.1 -e wg.example.com -o 1
 ```
 
 Options:
 - `-n` (optional): name for new peer, will prompt for this value if not supplied
 - `-d` (optional): DNS address for new peer to use
+- `-e` (optional): address of wireguard server - will default to using the server's public IP address if not supplied
 - `-o` (optional): peer configuration option, will prompt if not supplied. One of:
     1. QR Code
     2. Client automation script
@@ -81,12 +82,12 @@ The `init_server` and `add_peer` commands will generate a configuration file tha
 ```
 [Interface]
 PrivateKey = <private-key>
-Address = 10.8.0.2/24
+Address = 10.10.10.2/24
 
 [Peer]
 PublicKey = <public-key>
-AllowedIPs = 10.8.0.0/24, fd24:609a:6c18::/64
-Endpoint = 203.0.113.1:51820
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = wg.example.com:51820
 
 ```
 
