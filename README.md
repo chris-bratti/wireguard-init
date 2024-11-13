@@ -34,8 +34,13 @@ chmod +x init_wireguard.sh
 
 #### Run the Server Setup Command:
 ```
-sudo ./init_wireguard.sh init_server
+sudo ./init_wireguard.sh init_server -i 10.10.10.1/24 -p 51820
 ```
+
+Options:
+- `-i` (optional): internal address range for wireguard server - defaults to `10.10.10.1/24` if not supplied
+- `-p` (optional): port that wireguard will use to communicate with peers - defaults to `51820` if not supplied
+
 #### This command will:
 - Install WireGuard
 - Generate the server's private and public keys.
@@ -48,8 +53,16 @@ The script will give you the option to add a peer and automate the peer configur
 
 #### Add additional peers
 ```
-sudo ./init_wireguard.sh add_peer
+sudo ./init_wireguard.sh add_peer -n peerName -d 10.10.10.1 -o 1
 ```
+
+Options:
+- `-n` (optional): name for new peer, will prompt for this value if not supplied
+- `-d` (optional): DNS address for new peer to use
+- `-o` (optional): peer configuration option, will prompt if not supplied. One of:
+    1. QR Code
+    2. Client automation script
+    3. Manual setup
 
 #### This command will:
 - Find the next available IP in the server's address range
@@ -86,10 +99,12 @@ chmod +x init_wireguard.sh
 
 #### 3. Run the init_client command
 ```
-sudo ./init_wireguard.sh init_client /path/to/config.conf
+sudo ./init_wireguard.sh init_client /path/to/config.conf -a
 ```
 
-Where `path/to/config.conf` is the location of the configuration file that was copied onto the client machine.
+Options:
+- `/path/to/config` (required): path to the configuration file that was copied onto the client machine
+- `-a` (optional): option to run wireguard as a service on the client machine (not typically recommended)
 
 #### This command will:
 - Install WireGuard
