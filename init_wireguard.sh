@@ -288,11 +288,12 @@ add_peer() {
 		exit 1
 	fi
 
-	while getopts "n:d:o:" opt; do
+	while getopts "n:d:o:e:" opt; do
 		case $opt in
 		n) peerName="$OPTARG" ;;
 		d) dnsAddress="$OPTARG" ;;
 		o) configOption="$OPTARG" ;;
+		e) serverEndpoint="$OPTARG" ;;
 		*)
 			echo "Invalid option for add_peer"
 			exit 1
@@ -308,9 +309,11 @@ add_peer() {
 	# Gets the next available IP in the address range
 	nextIp=$(get_next_ip $configPath)
 
-	# Gets server public key as well as server's public IP address
+	# Gets server public key
 	publicKey=$(sudo cat $configPath/public.key)
-	publicIp="$(curl --silent ifconfig.me)"
+
+	# If no server endpoint supplied, defaults to getting server's public IP
+	[ -z $serverEndpoint ] && serverEndpoint="$(curl --silent ifconfig.me)"
 
 	info_message "Generating keys...."
 	# Generates peer public and private keys
@@ -336,7 +339,7 @@ EOF
 [Peer]
 PublicKey = $publicKey
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = $publicIp:$listenPort
+Endpoint = $serverEndpoint:$listenPort
 EOF
 
 	info_message "✅ Peer configuration generated"
@@ -630,6 +633,7 @@ show_help() {
 	info_message "      Arguments (Optional):"
 	info_message "        -n <name>: Name for new peer"
 	info_message "        -d <x.x.x.x>: DNS Address for peer to use"
+	info_message "        -e <wg.example.com>: Endpoint address of wireguard server"
 	info_message "        -o <#>: Peer configuration option. One of:"
 	info_message "                1. QR Code"
 	info_message "                2. Client automation script"
