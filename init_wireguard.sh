@@ -546,6 +546,7 @@ init_wireguard_server() {
 	done
 	shift $((OPTIND - 1))
 
+	# Validates the server options before continuing
 	validate_server_options
 
 	# Updates and installs Wireguard
