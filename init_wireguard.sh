@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Prints welcome banner
-print_banner () {
+print_banner() {
 	clear
 	banner="
 __        ___           ____                     _   ___       _ _   
@@ -27,15 +27,15 @@ __        ___           ____                     _   ___       _ _
 	echo -e "${CYAN}######################################################${NC}"
 
 	# Script needs to be run as root, so checks permissions before running
-	if [ "$EUID" -ne 0 ];then 
+	if [ "$EUID" -ne 0 ]; then
 		echo -e "${RED}This script requires root permissions, please run with sudo${NC}"
-  		exit
+		exit
 	fi
 
 }
 
 # Function to get user input and validate against a given regex pattern
-get_user_input () {
+get_user_input() {
 	local message=$1
 	local regex=$2
 	while true; do
@@ -51,7 +51,7 @@ get_user_input () {
 }
 
 # Function to get y/n input from a user, uses the get_user_input function
-get_binary_user_input () {
+get_binary_user_input() {
 	local answer=$(get_user_input "$1(y/n)" $binaryOptionRegex)
 	answer=$(echo $answer | tr '[:upper:]' '[:lower:]')
 	if [[ "$answer" = 'y' || "$answer" = "yes" ]]; then
@@ -63,17 +63,17 @@ get_binary_user_input () {
 
 # Displays small spinner to show a process running
 spinner() {
-    local pid=$!
-    local delay=0.1
-    local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep "$pid")" ]; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
+	local pid=$!
+	local delay=0.1
+	local spinstr='|/-\'
+	while [ "$(ps a | awk '{print $1}' | grep "$pid")" ]; do
+		local temp=${spinstr#?}
+		printf " [%c]  " "$spinstr"
+		local spinstr=$temp${spinstr%"$temp"}
+		sleep $delay
+		printf "\b\b\b\b\b\b"
+	done
+	printf "    \b\b\b\b"
 }
 
 # Checks peer's connection to server
@@ -82,8 +82,7 @@ check_connection() {
 	retries=0
 	# Checks the wireguard output for "latest handshake" to verify if handshake has been made.
 	# Retries until the retryLimit is reached
-	for (( retries=0; retries<=$retryLimit; retries++ ))
-	do
+	for ((retries = 0; retries <= $retryLimit; retries++)); do
 		if sudo wg | grep -q "latest handshake"; then
 			return 0
 		fi
@@ -94,61 +93,61 @@ check_connection() {
 }
 
 # Prints out info message
-info_message (){
+info_message() {
 	echo -e "${CYAN}$1${NC}" >&2
 }
 
 # Prints out success message
-success_message (){
+success_message() {
 	echo -e "${GREEN}$1${NC}" >&2
 }
 
 # Prints out error message
-error_message (){
+error_message() {
 	echo -e "${RED}$1${NC}" >&2
 }
 
 # Validates peer configuration file before processing it
-validate_config_file (){
+validate_config_file() {
 	local configFile=$1
 	# Checks if file exists
-    if [ ! -f "$configFile" ]; then
-        error_message "Error: Configuration file not found. Please check server script for instructions on running peer setup."
-        exit 1
-    fi
+	if [ ! -f "$configFile" ]; then
+		error_message "Error: Configuration file not found. Please check server script for instructions on running peer setup."
+		exit 1
+	fi
 
 	# Checks if file seems to be a valid wireguard config
-    if ! grep -q "\[Interface\]" "$configFile" || ! grep -q "\[Peer\]" "$configFile";then
-        error_message "Error: Configuration file seems to be malformed. Please check server script for instructions on running peer setup."
-        exit 1
-    fi
+	if ! grep -q "\[Interface\]" "$configFile" || ! grep -q "\[Peer\]" "$configFile"; then
+		error_message "Error: Configuration file seems to be malformed. Please check server script for instructions on running peer setup."
+		exit 1
+	fi
 
 	# Makes sure wireguard path exists
 	mkdir -p $configPath
 
 	# Copies file to wg0.conf
-    cp "$configFile" "$configPath/wg0.conf"
-    echo "$configPath/wg0.conf"
+	cp "$configFile" "$configPath/wg0.conf"
+	echo "$configPath/wg0.conf"
 }
 
 # Configures wireguard to run automatically as a service
-configure_wg_as_service (){
-    info_message "Configuring WireGuard to run automatically...."
-    sudo systemctl enable wg-quick@wg0.service > /dev/null
-    sudo systemctl start wg-quick@wg0.service > /dev/null
+configure_wg_as_service() {
+	info_message "Configuring WireGuard to run automatically...."
+	sudo systemctl enable wg-quick@wg0.service >/dev/null
+	sudo systemctl start wg-quick@wg0.service >/dev/null
 
 	# Checks to make sure WireGuard is running
-    if systemctl is-active --quiet wg-quick@wg0.service; then
+	if systemctl is-active --quiet wg-quick@wg0.service; then
 		success_message "WireGuard server is running!"
 	else
 		error_message "Error starting WireGuard server, please check logs"
 		return 1
 	fi
-    info_message "✅ Done"
+	info_message "✅ Done"
 }
 
 # Creates and initializes a new WireGuard client
-init_client (){
+init_client() {
 	# Displays warning to user to let them know configuring machine as a peer will overwrite any
 	#  existing configuration
 	error_message "WARNING: This script will overwrite any existing wireguard configuration and configure this machine as a wireguard peer!"
@@ -160,8 +159,8 @@ init_client (){
 
 	if [[ -z $1 ]]; then
 		error_message "No configuration file supplied"
-        error_message "Usage: $0 init_client /path/to/config.conf"
-        exit 1
+		error_message "Usage: $0 init_client /path/to/config.conf"
+		exit 1
 	fi
 
 	userConfFile="$1"
@@ -169,50 +168,54 @@ init_client (){
 
 	while getopts "a" opt; do
 		case $opt in
-			a) autoRunWg=true ;;
-			*) error_message "Invalid option for init_client"; show_help; exit 1 ;;
+		a) autoRunWg=true ;;
+		*)
+			error_message "Invalid option for init_client"
+			show_help
+			exit 1
+			;;
 		esac
 	done
-	shift $((OPTIND - 1)) 
+	shift $((OPTIND - 1))
 
 	# Validates config file
 	info_message "Validating config file...."
 	peerConfigFile=$(validate_config_file $userConfFile)
 	info_message "✅ Done"
 
-    info_message "Installing WireGuard...."
-    sudo apt update -y > /dev/null
-    
-    sudo apt install wireguard -y > /dev/null
+	info_message "Installing WireGuard...."
+	sudo apt update -y >/dev/null
 
-    sudo apt install resolvconf > /dev/null
-    info_message "✅ Done"
+	sudo apt install wireguard -y >/dev/null
 
-    info_message "Configuring client traffic routing...."
-    device=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
+	sudo apt install resolvconf >/dev/null
+	info_message "✅ Done"
+
+	info_message "Configuring client traffic routing...."
+	device=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
+	[ $(echo $device | wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
 	# Gets gateway address for client machine
-    gatewayAddress=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}')
+	gatewayAddress=$(ip route list table main default | awk '{for(i=1;i<=NF;i++) if($i=="via") print $(i+1)}')
 
 	# Gets internal ip address for network device
-    ipAddress=$(ip -brief address show $device | awk '{for(i=1;i<=NF;i++) if($i=="UP") print $(i+1)}' | sed 's#/.*##')
+	ipAddress=$(ip -brief address show $device | awk '{for(i=1;i<=NF;i++) if($i=="UP") print $(i+1)}' | sed 's#/.*##')
 
 	# Traffic routing rules to add to the wg0.conf file
-    routeTrafficLines="PostUp = ip rule add from $ipAddress table main\nPostUp = ip route add default via $gatewayAddress table main\nPreDown = ip rule delete from $ipAddress table main\nPreDown = ip route delete default via $gatewayAddress table main"
+	routeTrafficLines="PostUp = ip rule add from $ipAddress table main\nPostUp = ip route add default via $gatewayAddress table main\nPreDown = ip rule delete from $ipAddress table main\nPreDown = ip route delete default via $gatewayAddress table main"
 
 	# Add traffic routing lines
-    sed -i "/^Address = [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/[0-9]\{1,2\}$/a $routeTrafficLines" $peerConfigFile
+	sed -i "/^Address = [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\/[0-9]\{1,2\}$/a $routeTrafficLines" $peerConfigFile
 
-    info_message "✅ Done"
-	
+	info_message "✅ Done"
+
 	# Option to start wireguard by default
 	$autoRunWg && configure_wg_as_service
 
 	# Starts wireguard
-    sudo wg-quick up wg0 > /dev/null
+	sudo wg-quick up wg0 >/dev/null
 
 	# After wireguard is started, server script can continue
 	success_message "Wireguard started!"
@@ -239,12 +242,12 @@ init_client (){
 }
 
 # Given an ip, finds the next IP in that subnet
-increment_ip () {
-    echo "$1" | awk -F '[./]' '{ printf "%d.%d.%d.%d/%s\n", $1, $2, $3, $4+1, $5 }'
+increment_ip() {
+	echo "$1" | awk -F '[./]' '{ printf "%d.%d.%d.%d/%s\n", $1, $2, $3, $4+1, $5 }'
 }
 
 # Finds the next available IP using the wireguard config file
-get_next_ip (){
+get_next_ip() {
 	# Gets server address
 	local serverAddress=$(grep "Address" $1/wg0.conf | cut -d "=" -f 2 | xargs | sed 's/\/.*/\/32/')
 
@@ -255,8 +258,7 @@ get_next_ip (){
 	local nextIp=$(increment_ip $serverAddress)
 
 	# Increments nextIp until it finds one not in use by other peers
-	while true
-	do
+	while true; do
 		if printf "%s\n" "${usedIps[@]}" | grep -q -x "$nextIp"; then
 			nextIp=$(increment_ip $nextIp)
 		else
@@ -268,7 +270,7 @@ get_next_ip (){
 }
 
 # Validates the user-supplied options
-validate_peer_options (){
+validate_peer_options() {
 
 	if [[ -n $dnsAddress && ! $dnsAddress =~ $ipRegex ]]; then
 		error_message "Invalid DNS Address format"
@@ -283,7 +285,7 @@ validate_peer_options (){
 	# Each peer will have a unique config file based on a provided name
 	while true; do
 		if [ -f "$peerConfigPath/$peerName.conf" ]; then
-    		error_message "Peer config already exists, choose a different one"
+			error_message "Peer config already exists, choose a different one"
 			read -p "Create name for new peer: " peerName
 		else
 			newPeerPath="$peerConfigPath/$peerName.conf"
@@ -293,7 +295,7 @@ validate_peer_options (){
 }
 
 # Adds a peer to existing wireguard configuration
-add_peer () {
+add_peer() {
 	# Checks to make sure wireguard server has already been set up
 	if [ ! -f $configPath/wg0.conf ]; then
 		error_message "Could not add peer, WireGuard configuration not found"
@@ -302,14 +304,17 @@ add_peer () {
 	fi
 
 	while getopts "n:d:o:" opt; do
-        case $opt in
-            n) peerName="$OPTARG" ;;
-            d) dnsAddress="$OPTARG" ;;
-			o) configOption="$OPTARG" ;;
-            *) echo "Invalid option for add_peer"; exit 1 ;;
-        esac
-    done
-    shift $((OPTIND - 1)) 
+		case $opt in
+		n) peerName="$OPTARG" ;;
+		d) dnsAddress="$OPTARG" ;;
+		o) configOption="$OPTARG" ;;
+		*)
+			echo "Invalid option for add_peer"
+			exit 1
+			;;
+		esac
+	done
+	shift $((OPTIND - 1))
 
 	newPeerPath=""
 
@@ -322,7 +327,6 @@ add_peer () {
 	publicKey=$(sudo cat $configPath/public.key)
 	publicIp="$(curl --silent ifconfig.me)"
 
-	
 	info_message "Generating keys...."
 	# Generates peer public and private keys
 	peerPrivateKey=$(wg genkey)
@@ -335,14 +339,14 @@ add_peer () {
 		listenPort=$(sudo grep "ListenPort" $configPath/wg0.conf | cut -d "=" -f 2 | xargs)
 	fi
 
-# Creates the new peer configuration file
-cat << EOF > $newPeerPath
+	# Creates the new peer configuration file
+	cat <<EOF >$newPeerPath
 [Interface]
 Address = $nextIp
 PrivateKey = $peerPrivateKey
 EOF
-	if [ -n "$dnsAddress" ] && echo "DNS = $dnsAddress" >> $newPeerPath
-cat << EOF >> $newPeerPath
+	[ -n "$dnsAddress" ] && echo "DNS = $dnsAddress" >>$newPeerPath
+	cat <<EOF >>$newPeerPath
 
 [Peer]
 PublicKey = $publicKey
@@ -362,18 +366,18 @@ EOF
 	fi
 
 	case $configOption in
-		1)
-			setup_mobile_client $newPeerPath
-			;;
-		2)
-			client_script_config $newPeerPath
-			;;
-		3)
-			manual_client_cetup $newPeerPath
-			;;
-		*)
-			manual_client_cetup $newPeerPath
-			;;
+	1)
+		setup_mobile_client $newPeerPath
+		;;
+	2)
+		client_script_config $newPeerPath
+		;;
+	3)
+		manual_client_cetup $newPeerPath
+		;;
+	*)
+		manual_client_cetup $newPeerPath
+		;;
 	esac
 
 	info_message "Client configuration is located at $newPeerPath"
@@ -395,7 +399,7 @@ EOF
 }
 
 # Used for manual client setup, displays client config file for users to copy
-manual_client_cetup (){
+manual_client_cetup() {
 	info_message "Config file located at $1"
 	sudo cat $1
 	echo -e "${GREEN}Press enter to proceed${NC}"
@@ -403,15 +407,15 @@ manual_client_cetup (){
 }
 
 # Generates QR code from peer config file - useful for mobile devices
-setup_mobile_client (){
-	qrencode -t ansiutf8 < $1
+setup_mobile_client() {
+	qrencode -t ansiutf8 <$1
 	echo -e "${GREEN}Use QR code to set up mobile device, then press enter when done${NC}"
 	read
 }
 
 # Gives instructions on running the init_wg_client.sh script on client machine
-client_script_config (){
-	cat << EOF
+client_script_config() {
+	cat <<EOF
 ##################################################################
 #  For automated peer setup, you will need access to the         #
 #   peer machine. This script can be re-used to configure the    #
@@ -434,21 +438,20 @@ EOF
 }
 
 # If a user has multiple network devices, allows them to choose which one to configure
-choose_net_device (){
+choose_net_device() {
 	local deviceString=$1
 	local devicesArray=($deviceString)
 	local chosenDevice=""
 	info_message "More than one network device was detected on your system:"
-	
+
 	# Prints list of devices found
-	for netDevice in "${devicesArray[@]}"
-	do
+	for netDevice in "${devicesArray[@]}"; do
 		info_message "$netDevice"
 	done
 
 	# Loop for users to choose device. Double checks that chosen device is a valid choice from device list
 	info_message "You will need to choose which device you want the WireGuard server listening on"
-	while true; do   
+	while true; do
 		chosenDevice=$(get_user_input "Enter network device name" ".+")
 		if printf "%s\n" "${devicesArray[@]}" | grep -q -x "$chosenDevice"; then
 			echo $chosenDevice
@@ -461,13 +464,13 @@ choose_net_device (){
 }
 
 # Configures port forwarding to allow for full network sharing
-configure_port_forwarding (){
+configure_port_forwarding() {
 	# Adds forwarding rule to systctl
 	sudo sed -i '/^#*net\.ipv4\.ip_forward=1/s/^#//' /etc/sysctl.conf
 	info_message "Enabling network forwarding..."
 
-# TODO: check output to confirm rule was added
-	sudo sysctl -p > /dev/null
+	# TODO: check output to confirm rule was added
+	sudo sysctl -p >/dev/null
 
 	info_message "✅ Done"
 
@@ -476,9 +479,9 @@ configure_port_forwarding (){
 	device=$(ip route list default | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}')
 
 	# If more than one network device, have user choose which network device to use
-	[ $(echo $device |  wc -w) -gt 1 ] && device=$(choose_net_device "$device")
+	[ $(echo $device | wc -w) -gt 1 ] && device=$(choose_net_device "$device")
 
-	# UFW rules to add to wireguard configuration file	
+	# UFW rules to add to wireguard configuration file
 	portForwardingLines="PostUp = ufw route allow in on wg0 out on $device\nPostUp = iptables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPostUp = ip6tables -t nat -I POSTROUTING -o $device -j MASQUERADE\nPreDown = ufw route delete allow in on wg0 out on $device\nPreDown = iptables -t nat -D POSTROUTING -o $device -j MASQUERADE\nPreDown = ip6tables -t nat -D POSTROUTING -o $device -j MASQUERADE"
 
 	# Adds rules to conf file, in the [Interface] block
@@ -488,11 +491,11 @@ configure_port_forwarding (){
 
 	# Opens up listen port on wireguard server
 	info_message "Enabling firewall ports..."
-	sudo ufw allow $listenPort/udp > /dev/null
-	sudo ufw allow OpenSSH > /dev/null
+	sudo ufw allow $listenPort/udp >/dev/null
+	sudo ufw allow OpenSSH >/dev/null
 
 	# Restarts the ufw service
-	sudo ufw disable > /dev/null
+	sudo ufw disable >/dev/null
 	sudo ufw enable
 
 	info_message "✅ Done"
@@ -507,12 +510,12 @@ configure_port_forwarding (){
 	fi
 }
 
-validate_server_options (){
+validate_server_options() {
 
 	[ -z $subnetRange ] && subnetRange="10.10.10.1/24"
 
-	if [[ ! $subnetRange =~ $ipRangeRegex]]; then
-		error_message "IP range is not valid"		
+	if [[ ! $subnetRange =~ $ipRangeRegex ]]; then
+		error_message "IP range is not valid"
 		subnetRange=$(get_user_input "Enter a valid IP Range" $ipRangeRegex)
 	fi
 
@@ -529,7 +532,7 @@ validate_server_options (){
 }
 
 # Creates and initializes a new WireGuard server
-init_wireguard_server (){
+init_wireguard_server() {
 	error_message "WARNING: This script will overwrite any existing wireguard configuration and configure this machine as a wireguard server!"
 	if ! get_binary_user_input "Continue with server setup?"; then
 		info_message "Aborting server setup"
@@ -539,34 +542,37 @@ init_wireguard_server (){
 	listenPort=""
 
 	while getopts "i:p:" opt; do
-        case $opt in
-            i) subnetRange="$OPTARG" ;;
-            p) listenPort="$OPTARG" ;;
-            *) echo "Invalid option for init_server"; exit 1 ;;
-        esac
-    done
-    shift $((OPTIND - 1)) 
+		case $opt in
+		i) subnetRange="$OPTARG" ;;
+		p) listenPort="$OPTARG" ;;
+		*)
+			echo "Invalid option for init_server"
+			exit 1
+			;;
+		esac
+	done
+	shift $((OPTIND - 1))
 
 	validate_server_options
 
 	# Updates and installs Wireguard
 	info_message "Updating and installing wireguard...."
-	apt update -y > /dev/null
+	apt update -y >/dev/null
 
-	apt install wireguard -y > /dev/null
+	apt install wireguard -y >/dev/null
 
 	# Used for generating QR codes
-	apt install qrencode -y > /dev/null
+	apt install qrencode -y >/dev/null
 
 	info_message "✅ Done"
 
 	# Creates private and public keys
 	info_message "Generating keys...."
-	umask 077 && sudo wg genkey > "$configPath/private.key"
+	umask 077 && sudo wg genkey >"$configPath/private.key"
 
 	sudo chmod go= $configPath/private.key
 
-	sudo cat $configPath/private.key | wg pubkey > $configPath/public.key
+	sudo cat $configPath/private.key | wg pubkey >$configPath/public.key
 
 	info_message "✅ Done"
 
@@ -574,7 +580,7 @@ init_wireguard_server (){
 
 	# Generates the wireguard configuration file
 	info_message "Generating wireguard config...."
-cat <<EOF > $configPath/wg0.conf
+	cat <<EOF >$configPath/wg0.conf
 [Interface]
 PrivateKey = $privateKey
 Address = $subnetRange
@@ -618,7 +624,7 @@ EOF
 }
 
 # Shows help message
-show_help (){
+show_help() {
 	info_message "Usage: $0 <command> <options>"
 	info_message "Commands:"
 	success_message "  init_server - Creates a WireGuard server"
@@ -642,7 +648,10 @@ show_help (){
 	success_message "  help - Shows this help messasge!"
 }
 
-scriptPath="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+scriptPath="$(
+	cd -- "$(dirname "$0")" >/dev/null 2>&1
+	pwd -P
+)"
 # Regex for validating user input
 binaryOptionRegex="^[yYnN]$"
 ipRegex="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
@@ -662,31 +671,30 @@ NC='\033[0m'
 print_banner
 
 if [[ $# -lt 1 ]]; then
-    error_message "Error: No command provided."
-    show_help
-    exit 1
+	error_message "Error: No command provided."
+	show_help
+	exit 1
 fi
 
 command=$1
 shift
 
 case "$command" in
-    init_server)
-        init_wireguard_server "$@"
-        ;;
-	init_client)
-		init_client "$@"
-		;;
-    add_peer)
-        add_peer
-        ;;
-    help)
-        show_help
-        ;;
-    *)
-        error_message "Error: Unknown command '$command'"
-        show_help
-        exit 1
-        ;;
+init_server)
+	init_wireguard_server "$@"
+	;;
+init_client)
+	init_client "$@"
+	;;
+add_peer)
+	add_peer
+	;;
+help)
+	show_help
+	;;
+*)
+	error_message "Error: Unknown command '$command'"
+	show_help
+	exit 1
+	;;
 esac
-
