@@ -495,10 +495,13 @@ configure_port_forwarding() {
 	fi
 }
 
+# Validates user supplied options for server configuration
 validate_server_options() {
 
+	# If address range not supplied, uses default
 	[ -z $subnetRange ] && subnetRange="10.10.10.1/24"
 
+	# If addresss range is not valid, prompt for valid address range
 	if [[ ! $subnetRange =~ $ipRangeRegex ]]; then
 		error_message "IP range is not valid"
 		subnetRange=$(get_user_input "Enter a valid IP Range" $ipRangeRegex)
@@ -506,8 +509,10 @@ validate_server_options() {
 
 	info_message "✅ Address range set"
 
+	# Default port of 51820
 	[ -z $listenPort ] && listenPort="51820"
 
+	# If port is not valid, prompt for valid port
 	if [[ ! $listenPort =~ "[0-9]+" ]]; then
 		error_message "ListenPort is not valid"
 		listenPort=$(get_user_input "Enter a valid ListenPort" "[0-9]+")
